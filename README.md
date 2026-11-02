@@ -5,12 +5,14 @@
 [![npm](https://img.shields.io/npm/v/dsh-marktext.svg)](https://www.npmjs.com/package/dsh-marktext)
 [![publish](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml/badge.svg)](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml)
 
-![dsh-marktext — MarkText's editor in the DeepSeek Harness right sidebar](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-light.png)
+![dsh-marktext — the MarkText editor inside the DeepSeek Harness right sidebar](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dsh.png)
 
 <details>
-<summary>Dark theme</summary>
+<summary>Editor only — light and dark</summary>
 
-![dsh-marktext in dark theme](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dark.png)
+![Editor, light theme](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-light.png)
+
+![Editor, dark theme](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dark.png)
 
 </details>
 

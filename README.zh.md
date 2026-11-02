@@ -5,12 +5,14 @@
 [![npm](https://img.shields.io/npm/v/dsh-marktext.svg)](https://www.npmjs.com/package/dsh-marktext)
 [![publish](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml/badge.svg)](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml)
 
-![dsh-marktext — MarkText 内核的右侧栏 Markdown 编辑器](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-light.png)
+![dsh-marktext —— 在 DeepSeek Harness 右侧栏里编辑 Markdown](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dsh.png)
 
 <details>
-<summary>Dark theme</summary>
+<summary>只截编辑器（明 / 暗）</summary>
 
-![深色主题](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dark.png)
+![编辑器（明色）](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-light.png)
+
+![编辑器（暗色）](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dark.png)
 
 </details>
 
