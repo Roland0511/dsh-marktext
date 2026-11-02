@@ -122,13 +122,15 @@ curl -s http://127.0.0.1:<DSH端口>/dsh-marktext/api/diag | python3 -m json.too
 
 ## 发布
 
-仓库带 CI：推到 `main` 后，`.github/workflows/publish.yml` 会跑测试、校验 `renderer/` 与源码一致，
-然后**当 `package.json` 的版本还没发布过时**自动 `npm publish`。
+npm 侧已配置 **Trusted Publishing（OIDC）**：CI 不需要任何 token 或 secret，发布时自动换发短期凭证并生成 SLSA provenance。
 
-- 首次启用：在 npm 生成 automation token，然后
-  `gh secret set NPM_TOKEN --repo Roland0511/dsh-marktext`
-- 发新版：改 `package.json` 的 `version` → 推送；版本已存在则 CI 自动跳过，不会报红。
-- 也可以用 npm Trusted Publishing 代替 token（配好后删掉 secret 即可）。
+1. 改版本：`npm version patch --no-git-tag-version`
+2. 提交并推送：`git commit -am "chore: release x.y.z" && git push`
+3. GitHub Actions（`.github/workflows/publish.yml`）跑测试、校验 `renderer/` 与源码一致，版本未发布过就 `npm publish`
+
+版本号没变时发布会自动跳过（不会报红），所以文档和小改动可以随便推。
+
+> 首次发布（0.1.0）是本地人工发的；从 0.1.1 起全部由 CI 经 OIDC 发布。
 
 ## 开发
 
