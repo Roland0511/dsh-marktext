@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # create the tag + GitHub release
   id-token: write # npm Trusted Publishing (OIDC) + provenance
 
 concurrency:
@@ -59,6 +59,26 @@ jobs:
         if: steps.meta.outputs.exists == 'false'
         run: npm publish --access public --provenance
 
+      # npm 发布成功后再在 GitHub 上打 tag、建 release（幂等：tag/release 已存在就跳过）。
+      - name: Create GitHub release
+        if: steps.meta.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.meta.outputs.version }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $TAG already exists — nothing to do"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "tag $TAG already exists; creating the release on it"
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "$TAG" --generate-notes
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "$TAG" --generate-notes
+          fi
+
       - name: Summary
         run: |
           {
@@ -67,4 +87,5 @@ jobs:
             echo "- version: \`${{ steps.meta.outputs.version }}\`"
             echo "- already on npm: \`${{ steps.meta.outputs.exists }}\`"
             echo "- auth: npm Trusted Publishing (OIDC)"
+            echo "- github release: \`v${{ steps.meta.outputs.version }}\` (when a new version was published)"
           } >> "$GITHUB_STEP_SUMMARY"

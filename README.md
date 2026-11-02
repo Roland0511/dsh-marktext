@@ -142,7 +142,7 @@ node scripts/verify-renderer.mjs  # headless Chrome: open → render → save �
 
 ## Release
 
-Publishing uses **npm Trusted Publishing (OIDC)** — no token or secret is stored in the repository. On every push to `main` the workflow runs tests, verifies the committed `renderer/` matches `src/renderer/`, and publishes only when the version in `package.json` is new. Provenance is attached automatically.
+Publishing uses **npm Trusted Publishing (OIDC)** — no token or secret is stored in the repository. On every push to `main` the workflow runs tests, verifies the committed `renderer/` matches `src/renderer/`, and publishes only when the version in `package.json` is new. Provenance is attached automatically, and each new version also creates a **GitHub Release** (`v<version>`, auto-generated notes).
 
 ```sh
 npm version patch --no-git-tag-version

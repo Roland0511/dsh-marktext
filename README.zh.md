@@ -142,7 +142,7 @@ node scripts/verify-renderer.mjs  # headless Chrome：打开 → 渲染 → 保�
 
 ## 发布
 
-使用 **npm Trusted Publishing（OIDC）**，仓库里不存任何 token 或 secret。每次推送到 `main`，workflow 会跑测试、校验 `renderer/` 与源码一致，只有 `package.json` 的版本是新的才发布，并自动附带 provenance。
+使用 **npm Trusted Publishing（OIDC）**，仓库里不存任何 token 或 secret。每次推送到 `main`，workflow 会跑测试、校验 `renderer/` 与源码一致，只有 `package.json` 的版本是新的才发布，并自动附带 provenance；同时会在 GitHub 上打 tag 并创建 **Release**（`v<版本号>`，自动生成 release notes）。
 
 ```sh
 npm version patch --no-git-tag-version
