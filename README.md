@@ -5,6 +5,15 @@
 [![npm](https://img.shields.io/npm/v/dsh-marktext.svg)](https://www.npmjs.com/package/dsh-marktext)
 [![publish](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml/badge.svg)](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml)
 
+![dsh-marktext — MarkText's editor in the DeepSeek Harness right sidebar](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-light.png)
+
+<details>
+<summary>Dark theme</summary>
+
+![dsh-marktext in dark theme](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dark.png)
+
+</details>
+
 **MarkText's editor core, running inside the DeepSeek Harness right sidebar.** Open a `.md` file and edit it as a rendered document — headings, tables, math, diagrams and images — then save straight back to disk with a version guard.
 
 > MarkText is an Electron desktop app. This project does **not** ship its desktop shell: it uses the editor library MarkText extracts, [`@muyajs/core`](https://www.npmjs.com/package/@muyajs/core) (muya, MIT), and adds only the DSH integration around it.

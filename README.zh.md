@@ -5,6 +5,15 @@
 [![npm](https://img.shields.io/npm/v/dsh-marktext.svg)](https://www.npmjs.com/package/dsh-marktext)
 [![publish](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml/badge.svg)](https://github.com/Roland0511/dsh-marktext/actions/workflows/publish.yml)
 
+![dsh-marktext — MarkText 内核的右侧栏 Markdown 编辑器](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-light.png)
+
+<details>
+<summary>Dark theme</summary>
+
+![深色主题](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/screenshot-dark.png)
+
+</details>
+
 **把 MarkText 的编辑器内核装进 DeepSeek Harness 右侧栏。** 点开 `.md` 就是排版好的文档——标题、表格、公式、图表、图片——改完直接写回磁盘，保存带版本守卫，不会盲覆盖别人的修改。
 
 > MarkText 是 Electron 桌面应用，本项目**没有搬运它的桌面壳**，只使用它拆出来的编辑器库 [`@muyajs/core`](https://www.npmjs.com/package/@muyajs/core)（muya，MIT），外加一层 DSH 集成。所以这是「用 MarkText 的内核」，不是「在 DSH 里跑 MarkText」。
