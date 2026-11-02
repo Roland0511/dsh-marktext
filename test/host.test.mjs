@@ -270,3 +270,20 @@ test('falls back to native fs when the file policy denies the write', async (t) 
   assert.equal(stale.error.code, 'FS_STALE_VERSION')
   assert.equal(await readFile(file, 'utf8'), '# two two\n')
 })
+
+test('client diagnostics are accepted and readable', async (t) => {
+  await withRoot(t, async (root) => {
+    const host = createHost({ fs: fakeFs({}), rootDir: root, log: { warn() {} } })
+    const posted = await call(host, '/dsh-marktext/api/diag', 'POST', {
+      plugin: 'dsh-marktext',
+      bodyRegistered: false,
+      errors: ['tab body registration: ctx.slots unavailable'],
+    })
+    assert.equal(JSON.parse(posted.body).ok, true)
+
+    const read = JSON.parse((await call(host, '/dsh-marktext/api/diag')).body)
+    assert.equal(read.ok, true)
+    assert.equal(read.value[0].bodyRegistered, false)
+    assert.equal(read.value[0].errors.length, 1)
+  })
+})

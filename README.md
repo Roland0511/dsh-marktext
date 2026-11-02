@@ -106,6 +106,17 @@ lib/index.js（宿主插件）
 | 打开 → muya 渲染 → 点保存 → 落盘 | `node scripts/verify-renderer.mjs`，headless Chrome 真跑 |
 | 在 DSH 应用内的侧栏交互 | 未自动验证（需要重启 app 后才能看），装好后请先开一个 `.md` 试 |
 
+## 排查
+
+插件在浏览器侧注册完标签类型/标签体后，会向宿主上报一条诊断（`POST /dsh-marktext/api/diag`）。
+应用里出现「这类内容还没有可用的查看方式」时，直接看：
+
+```sh
+curl -s http://127.0.0.1:<DSH端口>/dsh-marktext/api/diag | python3 -m json.tool
+```
+
+`typeRegistered` / `bodyRegistered` 与 `errors` 会指出是哪一步没成。
+
 ## 开发
 
 ```sh
