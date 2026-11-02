@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # npm Trusted Publishing (OIDC) + provenance
 
 concurrency:
   group: npm-publish
@@ -17,12 +17,18 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Toolchain
+        run: |
+          node --version
+          npm --version
 
       - name: Install
         run: npm ci
@@ -48,22 +54,9 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check NPM_TOKEN
-        id: token
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::NPM_TOKEN 未配置，本次跳过发布（配置方式见 README）"
-          else
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish
-        if: steps.meta.outputs.exists == 'false' && steps.token.outputs.present == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # 无需 NPM_TOKEN：npm CLI 检测到 GitHub Actions 的 OIDC 环境后会自动换发短期凭证。
+      - name: Publish (trusted publishing)
+        if: steps.meta.outputs.exists == 'false'
         run: npm publish --access public --provenance
 
       - name: Summary
@@ -73,5 +66,5 @@ jobs:
             echo ""
             echo "- version: \`${{ steps.meta.outputs.version }}\`"
             echo "- already on npm: \`${{ steps.meta.outputs.exists }}\`"
-            echo "- token present: \`${{ steps.token.outputs.present }}\`"
+            echo "- auth: npm Trusted Publishing (OIDC)"
           } >> "$GITHUB_STEP_SUMMARY"
