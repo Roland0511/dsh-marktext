@@ -16,33 +16,36 @@
 
 ## 安装
 
-### 方式一：app 内插件市场
+### 方式一：DSH 应用内（推荐）
 
-在 DSH 的插件设置里安装 `dsh-marktext`（如果市场索引里已经有这个包）。
+侧栏 **Plugins** → **Add plugin** → **Install a third-party plugin**，输入：
 
-### 方式二：桌面 app 的 profile（推荐，当前仓库即插即用）
+```
+dsh-marktext
+```
 
-桌面版 profile 由 app 自己管理，手动安装的步骤与 `dsh-open-in` 相同：
+（GitHub 直装用 `github:Roland0511/dsh-marktext`；国内网络建议用 npm 包名。）
 
-1. 编辑 `~/.dsh/profiles/desktop/package.json`，在 `dsh.profile.bundles` 里加 `"dsh-marktext"`，在 `dependencies` 里加：
+装完点 **Enable now**，重启一次 app，打开任意 `.md` 即可。
 
-   ```json
-   "dsh-marktext": "github:Roland0511/dsh-marktext"
-   ```
-
-2. 安装依赖并重启 app：
-
-   ```sh
-   cd ~/.dsh/profiles/desktop && corepack pnpm install
-   ```
-
-### 方式三：命令行（web profile）
+### 方式二：命令行（web profile）
 
 ```sh
+dsh plugin --profile web add dsh-marktext
+# 或从 GitHub：
 dsh plugin --profile web add github:Roland0511/dsh-marktext
 ```
 
-> 注意：桌面 app 的 `desktop` profile 不接受 `dsh plugin --profile desktop`，请用方式二。
+### 方式三：手动改 profile（桌面 app，兜底）
+
+桌面 app 的 `desktop` profile 由 app 自己管理，`dsh plugin --profile desktop` 会被拒绝。手动装：
+
+1. 编辑 `~/.dsh/profiles/desktop/package.json`
+2. `dsh.profile.bundles` 加 `"dsh-marktext"`，`dependencies` 加 `"dsh-marktext": "github:Roland0511/dsh-marktext"`
+3. `cd ~/.dsh/profiles/desktop && pnpm install`
+4. 重启 app
+
+> 注意：桌面 app 的 `desktop` profile 不接受 `dsh plugin --profile desktop`，请用方式一或方式三。
 
 ## 卸载
 
@@ -116,6 +119,16 @@ curl -s http://127.0.0.1:<DSH端口>/dsh-marktext/api/diag | python3 -m json.too
 ```
 
 `typeRegistered` / `bodyRegistered` 与 `errors` 会指出是哪一步没成。
+
+## 发布
+
+仓库带 CI：推到 `main` 后，`.github/workflows/publish.yml` 会跑测试、校验 `renderer/` 与源码一致，
+然后**当 `package.json` 的版本还没发布过时**自动 `npm publish`。
+
+- 首次启用：在 npm 生成 automation token，然后
+  `gh secret set NPM_TOKEN --repo Roland0511/dsh-marktext`
+- 发新版：改 `package.json` 的 `version` → 推送；版本已存在则 CI 自动跳过，不会报红。
+- 也可以用 npm Trusted Publishing 代替 token（配好后删掉 secret 即可）。
 
 ## 开发
 

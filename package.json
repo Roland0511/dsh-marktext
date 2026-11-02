@@ -61,5 +61,8 @@
   "homepage": "https://github.com/Roland0511/dsh-marktext",
   "bugs": {
     "url": "https://github.com/Roland0511/dsh-marktext/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
