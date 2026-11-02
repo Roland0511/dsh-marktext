@@ -140,7 +140,12 @@ function registerUiPlugins() {
 
 function createEditor(markdown) {
   state.suppressChange = true
-  state.muya = new Muya(el.editor, { markdown, footnote: true, codeBlockLineNumbers: false })
+  state.muya = new Muya(el.editor, {
+    markdown,
+    footnote: true,
+    codeBlockLineNumbers: false,
+    mermaidTheme: state.dark ? 'dark' : 'default',
+  })
   try {
     state.muya.locale(state.locale === 'en' ? en : zh)
   } catch {
