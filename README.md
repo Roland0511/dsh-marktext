@@ -90,6 +90,15 @@ lib/index.js（宿主插件）
 - 与 `dsh-markdown-typora` 功能重叠：两者都注册 `*.md`（`extension` band），同时安装时由 DSH 的注册顺序决定谁生效，建议只留一个。
 - 依赖 DSH 0.2.1+ 的 `ctx.sidebarRightTabs` / `ctx.slots` / `ctx.fs` / `ctx.webServer`。
 
+## 已验证到什么程度
+
+| 项目 | 状态 |
+|---|---|
+| 宿主路由 / 版本守卫 / 路径穿越 / Origin 栅栏 | `npm test`，8 个用例 |
+| 客户端注册（`sidebarRightTabs` + `slots`） | `npm test` 的 vm 用例，按 DSH 契约断言注册参数 |
+| 打开 → muya 渲染 → 点保存 → 落盘 | `node scripts/verify-renderer.mjs`，headless Chrome 真跑 |
+| 在 DSH 应用内的侧栏交互 | 未自动验证（需要重启 app 后才能看），装好后请先开一个 `.md` 试 |
+
 ## 开发
 
 ```sh

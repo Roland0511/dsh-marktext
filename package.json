@@ -53,5 +53,13 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Roland0511/dsh-marktext.git"
+  },
+  "homepage": "https://github.com/Roland0511/dsh-marktext",
+  "bugs": {
+    "url": "https://github.com/Roland0511/dsh-marktext/issues"
   }
 }
