@@ -26,6 +26,7 @@
 - 真正的所见即所得：markdown 标记隐藏，标题/列表/表格/引用/代码块都是真实 DOM
 - 公式（KaTeX）、Mermaid、Vega、PlantUML、Prism 代码高亮全部内置且离线，按需加载
 - 顶栏有文件名、未保存圆点、状态和「保存」按钮；`⌘S` / `Ctrl+S` 随时保存
+- 支持 `⌘Z` / `⇧⌘Z` 撤销重做（Windows 下 `Ctrl+Z` / `Ctrl+Shift+Z`）
 - 停止输入 2.5 秒后自动保存
 - 深色/浅色跟随宿主主题
 - markdown 里的相对图片（`![](assets/a.png)`）按文档所在目录加载

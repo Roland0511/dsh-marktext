@@ -252,9 +252,29 @@ window.addEventListener('message', (event) => {
 el.save.addEventListener('click', () => requestSave())
 
 document.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+  if (!(event.metaKey || event.ctrlKey)) return
+  const key = event.key.toLowerCase()
+
+  if (key === 's') {
     event.preventDefault()
     requestSave()
+    return
+  }
+
+  // muya 只暴露 undo()/redo()，不自己绑快捷键；编辑器外层（MarkText 桌面端）负责这一步。
+  if (!state.muya) return
+  const target = event.target
+  const nativeField = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+  if (nativeField) return
+  if (key === 'z') {
+    event.preventDefault()
+    if (event.shiftKey) state.muya.redo()
+    else state.muya.undo()
+    return
+  }
+  if (key === 'y') {
+    event.preventDefault()
+    state.muya.redo()
   }
 })
 

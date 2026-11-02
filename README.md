@@ -26,6 +26,7 @@
 - True WYSIWYG: markdown markers are hidden, blocks are real DOM (headings, lists, tables, quotes, code)
 - KaTeX math, Mermaid, Vega, PlantUML and Prism highlighting ship offline and load on demand
 - Toolbar with the file name, unsaved dot, status and a Save button; `⌘S` / `Ctrl+S` saves any time
+- Undo and redo with `⌘Z` / `⇧⌘Z` (and `Ctrl+Z` / `Ctrl+Shift+Z`)
 - Autosave 2.5 s after you stop typing
 - Follows the host light/dark theme
 - Relative images in the markdown (`![](assets/a.png)`) resolve against the document's own folder
