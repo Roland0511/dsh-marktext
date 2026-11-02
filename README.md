@@ -82,6 +82,13 @@ lib/index.js（宿主插件）
 | up | `reload` | — |
 | up | `open-external` | `{ href }` |
 
+## 保存与文件策略
+
+- 正常路径：`ctx.fs.writeText(target, text, { kind: 'replaceIfVersion', version })`，版本不符返回 `FS_STALE_VERSION`，界面弹冲突横幅，绝不覆盖。
+- 如果宿主文件策略拒绝了写入（`FS_SANDBOX_DENIED`，例如策略是 `workspace-write` / `read-only`），保存会回退到 Node 原生 `fs.writeFile`，**版本守卫不放松**：写前先用 `ctx.fs.stat` 比对 `baseVersion`，不一致同样报 `FS_STALE_VERSION`；写后再用 `ctx.fs.stat` 取新版本。
+- 回退只作用于「保存」这一个动作，插件不因此获得其它写能力；真正的 OS 权限错误（EACCES/EPERM）会原样报错。
+- 回退成功时 `POST /save` 的返回值带 `nativeFallback: true`，便于排查。
+
 ## 已知限制
 
 - **只认相对图片路径**：`![](assets/a.png)` 可以，`/绝对路径/a.png` 或 `file://` 暂不支持。

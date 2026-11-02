@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -217,4 +217,56 @@ test('apply mounts a prefix route and cleans up on dispose', async () => {
 
   for (const cleanup of cleanups) cleanup?.()
   assert.equal(ctx.disposedRoute, true)
+})
+
+test('falls back to native fs when the file policy denies the write', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-marktext-native-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const file = join(dir, 'a.md')
+  await writeFile(file, '# one\n')
+
+  const fs = {
+    async resolve(path) {
+      return { displayPath: path, targetKey: path }
+    },
+    async stat(target) {
+      const info = await stat(target.displayPath)
+      return { type: 'file', version: `${info.mtimeMs}-${info.size}`, size: info.size }
+    },
+    async readText(target) {
+      return readFile(target.displayPath, 'utf8')
+    },
+    async writeText() {
+      throw Object.assign(new Error('cannot write: file access denied under workspace-write mode'), {
+        code: 'FS_SANDBOX_DENIED',
+      })
+    },
+  }
+
+  const host = createHost({ fs, rootDir: dir, log: { warn() {} } })
+  const opened = JSON.parse((await call(host, '/dsh-marktext/api/open', 'POST', { path: file })).body)
+  assert.equal(opened.ok, true)
+
+  const saved = JSON.parse(
+    (await call(host, '/dsh-marktext/api/save', 'POST', {
+      path: file,
+      text: '# two two\n',
+      baseVersion: opened.value.version,
+    })).body,
+  )
+  assert.equal(saved.ok, true)
+  assert.equal(saved.value.nativeFallback, true)
+  assert.equal(await readFile(file, 'utf8'), '# two two\n')
+
+  // 回退路径同样保留版本守卫：旧版本再来一次必须被拒。
+  const stale = JSON.parse(
+    (await call(host, '/dsh-marktext/api/save', 'POST', {
+      path: file,
+      text: '# three\n',
+      baseVersion: opened.value.version,
+    })).body,
+  )
+  assert.equal(stale.ok, false)
+  assert.equal(stale.error.code, 'FS_STALE_VERSION')
+  assert.equal(await readFile(file, 'utf8'), '# two two\n')
 })
