@@ -150,6 +150,10 @@ git commit -am "chore: release x.y.z"
 git push
 ```
 
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Roland0511/dsh-marktext&type=Date)](https://star-history.com/#Roland0511/dsh-marktext&Date)
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Third-party components and MarkText attribution: [NOTICE.md](NOTICE.md).
