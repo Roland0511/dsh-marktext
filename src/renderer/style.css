@@ -1,0 +1,170 @@
+/* dsh-marktext renderer chrome: 一条极简顶栏 + 可滚动稿纸。编辑器本体全部由 muya 提供。 */
+
+:root {
+  --mt-bar-height: 34px;
+  --mt-bar-bg: #f7f8fa;
+  --mt-bar-fg: #5b6472;
+  --mt-bar-border: #e6e8ee;
+  --mt-accent: #247bbf;
+  --mt-danger: #c0392b;
+  --mt-ok: #1f8a4c;
+}
+
+html.dark {
+  --mt-bar-bg: #202127;
+  --mt-bar-fg: #a8b0bd;
+  --mt-bar-border: #31333c;
+  --mt-accent: #5aa9e6;
+  --mt-danger: #e0715f;
+  --mt-ok: #57c08a;
+
+  /* muya 的主题变量（core.css 只在 :root 给了亮色，这里补暗色） */
+  --theme-color: #5aa9e6;
+  --highlight-color: rgb(90 169 230 / 32%);
+  --selection-color: rgb(90 169 230 / 28%);
+  --editor-color: #d7dbe2;
+  --editor-color-80: #c2c8d2;
+  --editor-color-50: #8b93a1;
+  --editor-color-30: #5d6472;
+  --editor-color-10: #3a3d47;
+  --editor-color-04: #2c2f37;
+  --editor-bg-color: #1b1c21;
+  --delete-color: #e0715f;
+  --icon-color: #9aa3b2;
+  --code-block-bg-color: rgb(255 255 255 / 5%);
+  --table-border-color: #3a3d47;
+  --float-bg-color: #262832;
+  --float-border-color: rgb(255 255 255 / 12%);
+  --float-hover-color: rgb(255 255 255 / 8%);
+  --float-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  --button-bg-color-hover: rgb(255 255 255 / 8%);
+  --button-border: 1px solid #3a3d47;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--editor-bg-color, #fff);
+  color: var(--editor-color, #4d4d4d);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  overflow: hidden;
+}
+
+#bar {
+  flex: 0 0 var(--mt-bar-height);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--mt-bar-bg);
+  color: var(--mt-bar-fg);
+  border-bottom: 1px solid var(--mt-bar-border);
+  font-size: 12px;
+  user-select: none;
+}
+
+.doc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--editor-color, #333);
+}
+
+.dirty-dot {
+  color: var(--mt-accent);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.status {
+  margin-left: auto;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.status[data-tone='ok'] {
+  color: var(--mt-ok);
+}
+
+.status[data-tone='warn'] {
+  color: var(--mt-accent);
+}
+
+.status[data-tone='error'] {
+  color: var(--mt-danger);
+}
+
+.save {
+  appearance: none;
+  border: 1px solid var(--mt-bar-border);
+  background: transparent;
+  color: var(--mt-bar-fg);
+  border-radius: 6px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.save:hover {
+  border-color: var(--mt-accent);
+  color: var(--mt-accent);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--mt-danger);
+  background: color-mix(in srgb, var(--mt-danger) 10%, transparent);
+  border-bottom: 1px solid var(--mt-bar-border);
+}
+
+.banner[hidden] {
+  display: none;
+}
+
+.banner-action {
+  margin-left: auto;
+  appearance: none;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+#editor.mu-editor {
+  min-height: 100%;
+}
+
+/* 侧栏窄的时候收窄稿纸留白 */
+@media (max-width: 720px) {
+  .mu-container {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+}

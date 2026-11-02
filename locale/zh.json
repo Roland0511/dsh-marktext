@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MarkText 编辑器",
+    "description": "用 MarkText 的所见即所得内核（muya）在右侧栏编辑 Markdown：标题、表格、公式、图表直接按渲染结果编辑，保存带版本守卫。"
+  }
+}

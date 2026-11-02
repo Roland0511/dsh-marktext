@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MarkText Editor",
+    "description": "Edit Markdown in the right sidebar with MarkText's WYSIWYG engine (muya): rendered headings, tables, math and diagrams, saved back with a version guard."
+  }
+}

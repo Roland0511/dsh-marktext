@@ -1,0 +1,57 @@
+{
+  "name": "dsh-marktext",
+  "version": "0.1.0",
+  "description": "MarkText (muya) WYSIWYG Markdown editor in the DeepSeek Harness right sidebar: open .md files, edit them as rendered documents, save back with a version guard.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib",
+    "renderer",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "markdown",
+    "editor",
+    "marktext",
+    "muya",
+    "wysiwyg"
+  ],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  },
+  "scripts": {
+    "build:renderer": "vite build --config src/renderer/vite.config.js",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@muyajs/core": "0.2.0",
+    "vite": "^7.3.7"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

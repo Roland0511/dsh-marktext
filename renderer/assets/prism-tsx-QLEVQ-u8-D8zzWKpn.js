@@ -1,0 +1,1 @@
+(function(t){var e=t.util.clone(t.languages.typescript);t.languages.tsx=t.languages.extend("jsx",e),delete t.languages.tsx.parameter,delete t.languages.tsx["literal-property"];var a=t.languages.tsx.tag;a.pattern=RegExp("(^|[^\\w$]|(?=<\\/))(?:"+a.pattern.source+")",a.pattern.flags),a.lookbehind=!0})(Prism);

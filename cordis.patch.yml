@@ -1,0 +1,4 @@
+# dsh-marktext: 把 MarkText 内核（muya）挂成右侧栏的 .md 编辑器。
+- insert:
+    - id: dsh-marktext
+      name: dsh-marktext
