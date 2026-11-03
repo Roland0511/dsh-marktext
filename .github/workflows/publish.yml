@@ -55,9 +55,20 @@ jobs:
           fi
 
       # 无需 NPM_TOKEN：npm CLI 检测到 GitHub Actions 的 OIDC 环境后会自动换发短期凭证。
+      # npm view 走 CDN 缓存，刚发过的版本可能还查不到（会误判成"未发布"），
+      # 所以 publish 冲突也按成功处理：版本已经存在，本来就不用再发。
       - name: Publish (trusted publishing)
         if: steps.meta.outputs.exists == 'false'
-        run: npm publish --access public --provenance
+        run: |
+          set +e
+          output=$(npm publish --access public --provenance 2>&1)
+          code=$?
+          echo "$output"
+          if [ $code -ne 0 ] && echo "$output" | grep -qiE "cannot publish over|previously published|EPUBLISHCONFLICT|E403"; then
+            echo "::notice::version already exists on the registry — nothing to publish"
+            exit 0
+          fi
+          exit $code
 
       # npm 发布成功后再在 GitHub 上打 tag、建 release（幂等：tag/release 已存在就跳过）。
       - name: Create GitHub release
