@@ -107,7 +107,7 @@ function render(series, total) {
   <circle cx="${x(series.length - 1).toFixed(1)}" cy="${y(total).toFixed(1)}" r="4" fill="#e8873a"/>
   <text x="${(x(series.length - 1) - 8).toFixed(1)}" y="${(y(total) - 12).toFixed(1)}" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="600" fill="#1f2630">${total}</text>
   ${xLabels}
-  <text x="${pad.left + innerW / 2}" y="${H - 8}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" fill="#9aa3b2">generated ${new Date().toISOString().slice(0, 10)}</text>
+  <text x="${pad.left + innerW / 2}" y="${H - 8}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" fill="#9aa3b2">source: GitHub stargazers</text>
 </svg>
 `
 }
