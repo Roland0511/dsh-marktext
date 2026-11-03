@@ -1,6 +1,6 @@
 {
   "name": "dsh-marktext",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "MarkText (muya) WYSIWYG Markdown editor in the DeepSeek Harness right sidebar: open .md files, edit them as rendered documents, save back with a version guard.",
   "type": "module",
   "license": "MIT",

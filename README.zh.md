@@ -155,7 +155,7 @@ git push
 
 ## Star 趋势
 
-[![Star history](https://raw.githubusercontent.com/Roland0511/dsh-marktext/main/docs/assets/star-history.svg)](https://github.com/Roland0511/dsh-marktext/stargazers)
+[![Star History Chart](https://api.star-history.com/svg?repos=Roland0511/dsh-marktext&type=Date)](https://star-history.com/#Roland0511/dsh-marktext&Date)
 
 ## 许可
 
