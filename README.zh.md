@@ -155,7 +155,13 @@ git push
 
 ## Star 趋势
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Roland0511/dsh-marktext&type=Date)](https://star-history.com/#Roland0511/dsh-marktext&Date)
+<a href="https://www.star-history.com/?type=date&repos=Roland0511%2Fdsh-marktext">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Roland0511/dsh-marktext&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Roland0511/dsh-marktext&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Roland0511/dsh-marktext&type=date&legend=top-left" />
+  </picture>
+</a>
 
 ## 许可
 
