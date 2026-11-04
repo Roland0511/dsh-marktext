@@ -133,7 +133,7 @@ function registerUiPlugins() {
   safe(LinkTools, {
     jumpClick: (info) => {
       const href = info?.href
-      if (typeof href === 'string' && /^https?:/i.test(href)) post('open-external', { href })
+      if (typeof href === 'string' && href.length > 0) post('open-link', { href })
     },
   })
 }
@@ -250,6 +250,24 @@ window.addEventListener('message', (event) => {
 })
 
 el.save.addEventListener('click', () => requestSave())
+
+// 编辑器里的链接交给宿主处理：`other.md` 应该在 DSH 里再开一个 marktext 标签页，
+// 而不是让 iframe 导航到原始文件（浏览器会把 .md 当纯文本显示）。
+document.addEventListener(
+  'click',
+  (event) => {
+    const target = event.target
+    // muya 把链接渲染成 <span class="mu-link" href="...">，不是 <a>，所以两种都要认。
+    const anchor = target && typeof target.closest === 'function' ? target.closest('a[href], .mu-link[href]') : null
+    if (!anchor) return
+    const href = anchor.getAttribute('href') ?? ''
+    if (href === '' || href.startsWith('#')) return
+    event.preventDefault()
+    event.stopPropagation()
+    post('open-link', { href })
+  },
+  true,
+)
 
 document.addEventListener('keydown', (event) => {
   if (!(event.metaKey || event.ctrlKey)) return

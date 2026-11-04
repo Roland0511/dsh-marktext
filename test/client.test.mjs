@@ -90,3 +90,24 @@ test('client registers the marktext tab type and its body seat', async () => {
   assert.equal(slotSeats[0].options.key, 'dsh-marktext/editor')
   assert.equal(typeof slotSeats[0].component, 'function')
 })
+
+test('in-document links resolve to DSH resource addresses', async () => {
+  const { module } = await loadPlugin()
+  const { resolveResourceAddress } = module.__test
+  const base = 'dsh-resource://file/session/s1/docs/guide.md'
+
+  assert.equal(resolveResourceAddress('other.md', base), 'dsh-resource://file/session/s1/docs/other.md')
+  assert.equal(resolveResourceAddress('./other.md?x=1#top', base), 'dsh-resource://file/session/s1/docs/other.md')
+  assert.equal(resolveResourceAddress('../notes/b.md', base), 'dsh-resource://file/session/s1/notes/b.md')
+  assert.equal(resolveResourceAddress('a%20b.md', base), 'dsh-resource://file/session/s1/docs/a%20b.md')
+  assert.equal(resolveResourceAddress('/Users/me/doc.md', base), 'dsh-resource://file/absolute/Users/me/doc.md')
+  assert.equal(
+    resolveResourceAddress('pic.png', 'dsh-resource://file/absolute/Users/me/dir/a.md'),
+    'dsh-resource://file/absolute/Users/me/dir/pic.png',
+  )
+
+  assert.equal(resolveResourceAddress('https://example.com/a.md', base), undefined)
+  assert.equal(resolveResourceAddress('mailto:a@b.c', base), undefined)
+  assert.equal(resolveResourceAddress('#section', base), undefined)
+  assert.equal(resolveResourceAddress('', base), undefined)
+})
