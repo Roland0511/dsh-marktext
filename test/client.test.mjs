@@ -111,3 +111,82 @@ test('in-document links resolve to DSH resource addresses', async () => {
   assert.equal(resolveResourceAddress('#section', base), undefined)
   assert.equal(resolveResourceAddress('', base), undefined)
 })
+
+test('a selection becomes a blockquote with its source path', async () => {
+  const { module } = await loadPlugin()
+  const { buildQuote, appendQuote } = module.__test
+
+  assert.equal(buildQuote('a\nb'), '> a\n> b\n\n')
+  assert.equal(buildQuote('a\n\nb'), '> a\n>\n> b\n\n')
+  assert.equal(buildQuote('x\r\ny'), '> x\n> y\n\n')
+  assert.equal(buildQuote('x', 'docs/plan.md'), '> `docs/plan.md`\n>\n> x\n\n')
+  assert.equal(buildQuote('   '), '>    \n\n')
+
+  assert.equal(appendQuote('', '> q\n\n'), '> q\n\n')
+  assert.equal(appendQuote('ask: \n', '> q\n\n'), 'ask:\n\n> q\n\n')
+  assert.equal(appendQuote('ask', '> q\n\n'), 'ask\n\n> q\n\n')
+})
+
+test('a quote goes into the session draft through the conversation facade', async () => {
+  const { module } = await loadPlugin()
+  const { quoteIntoDraft } = module.__test
+
+  const calls = []
+  const facade = {
+    state: { getSnapshot: () => ({ draft: 'existing ask\n', draftRev: 7 }) },
+    setDraft: (text) => calls.push(['setDraft', text]),
+    focus: () => calls.push(['focus']),
+    notify: (level, text) => calls.push(['notify', level, text]),
+  }
+  const sessions = { binding: (id) => (id === 's1' ? { ctx: { session: 's1' } } : undefined) }
+  const conversation = { input: { for: (ctx) => (calls.push(['for', ctx]) && facade) } }
+
+  const result = quoteIntoDraft({
+    conversation,
+    sessions,
+    sessionId: 's1',
+    quote: '> `notes/a.md`\n>\n> hi\n\n',
+    notice: '已引用到对话',
+  })
+
+  assert.equal(result, facade)
+  assert.deepEqual(calls[0], ['for', { session: 's1' }])
+  assert.deepEqual(calls[1], ['setDraft', 'existing ask\n\n> `notes/a.md`\n>\n> hi\n\n'])
+  assert.deepEqual(calls[2], ['focus'])
+  assert.deepEqual(calls[3], ['notify', 'info', '已引用到对话'])
+
+  // 宿主缺服务时返回 undefined，让调用方走剪贴板兜底
+  assert.equal(quoteIntoDraft({ sessions, sessionId: 's1', quote: '> x' }), undefined)
+  assert.equal(quoteIntoDraft({ conversation, sessions, quote: '> x' }), undefined)
+  assert.equal(quoteIntoDraft({ conversation, sessions, sessionId: 'nope', quote: '> x' }), undefined)
+  assert.equal(
+    quoteIntoDraft({ conversation: { input: null }, sessions, sessionId: 's1', quote: '> x' }),
+    undefined,
+  )
+})
+
+test('a saved file maps back to a DSH resource address', async () => {
+  const { module } = await loadPlugin()
+  const { toResourceAddress } = module.__test
+
+  assert.equal(
+    toResourceAddress('/ws/notes/plan.pdf', 's1', '/ws'),
+    'dsh-resource://file/session/s1/notes/plan.pdf',
+  )
+  assert.equal(
+    toResourceAddress('/ws/a b/plan-1.pdf', 's1', '/ws'),
+    'dsh-resource://file/session/s1/a%20b/plan-1.pdf',
+  )
+  assert.equal(
+    toResourceAddress('/other/plan.pdf', 's1', '/ws'),
+    'dsh-resource://file/absolute/other/plan.pdf',
+  )
+  assert.equal(toResourceAddress('/ws/plan.pdf', undefined, undefined), 'dsh-resource://file/absolute/ws/plan.pdf')
+  assert.equal(toResourceAddress('', 's1', '/ws'), undefined)
+
+  // Windows 分隔符也认
+  assert.equal(
+    toResourceAddress('C:\\ws\\notes\\plan.pdf', 's1', 'C:\\ws'),
+    'dsh-resource://file/session/s1/notes/plan.pdf',
+  )
+})

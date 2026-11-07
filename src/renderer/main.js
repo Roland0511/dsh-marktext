@@ -29,12 +29,38 @@ import './style.css'
 const AUTOSAVE_MS = 2500
 const ENVELOPE = '__dshmkt'
 const SAVE_LABEL = { zh: '保存', en: 'Save' }
+const TOOL_LABEL = {
+  zh: { quote: '引用', pdf: 'PDF', quoteTitle: '选中文字后引用到对话', pdfTitle: '导出 PDF 文件 (⌘P)' },
+  en: { quote: 'Quote', pdf: 'PDF', quoteTitle: 'Quote the selection into the chat', pdfTitle: 'Export a PDF file (⌘P)' },
+}
+const STATUS_TEXT = {
+  zh: {
+    noSelection: '先选中要引用的文字',
+    inserted: '已插入对话',
+    copied: '已复制，⌘V 粘贴到对话',
+    failed: '插入失败',
+    exporting: '正在生成 PDF…',
+    exported: '已保存',
+    exportFailed: 'PDF 生成失败',
+  },
+  en: {
+    noSelection: 'Select some text first',
+    inserted: 'Inserted into the chat',
+    copied: 'Copied — paste with ⌘V',
+    failed: 'Could not insert',
+    exporting: 'Building PDF…',
+    exported: 'Saved',
+    exportFailed: 'PDF export failed',
+  },
+}
 
 const el = {
   name: document.getElementById('doc-name'),
   dot: document.getElementById('dirty-dot'),
   status: document.getElementById('status'),
   save: document.getElementById('save'),
+  quote: document.getElementById('quote'),
+  pdf: document.getElementById('pdf'),
   banner: document.getElementById('banner'),
   bannerText: document.getElementById('banner-text'),
   bannerAction: document.getElementById('banner-action'),
@@ -53,7 +79,10 @@ const state = {
   autosaveTimer: null,
   locale: 'zh',
   dark: false,
+  /** 最近一次非空选区。点按钮会让编辑器失焦，所以点击前要先记住。 */
+  selection: '',
 }
+
 
 /* ── 父页面通道 ─────────────────────────────────────────────── */
 
@@ -104,6 +133,73 @@ function applyTheme(dark) {
   document.documentElement.classList.toggle('dark', state.dark)
   document.documentElement.style.colorScheme = state.dark ? 'dark' : 'light'
 }
+
+/* ── 选区 / 引用到对话 / 导出 PDF ───────────────────────────── */
+
+function currentSelection() {
+  try {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return ''
+    return String(selection.toString())
+  } catch {
+    return ''
+  }
+}
+
+function rememberSelection() {
+  const text = currentSelection()
+  if (text.trim().length > 0) state.selection = text
+  const enabled = text.trim().length > 0
+  el.quote.disabled = !enabled
+}
+
+function quoteSelection() {
+  // mousedown 已经阻止了失焦，正常情况下选区还在；拿不到就退回上次记住的。
+  const text = (currentSelection() || state.selection).trim()
+  const label = STATUS_TEXT[state.locale]
+  if (text.length === 0) {
+    setStatus(label.noSelection, 'warn')
+    return
+  }
+  post('insert-chat', { text })
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      const comma = result.indexOf(',')
+      resolve(comma === -1 ? '' : result.slice(comma + 1))
+    }
+    reader.onerror = () => reject(reader.error || new Error('blob read failed'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+let exporting = false
+
+async function exportDocument() {
+  if (exporting) return
+  const label = STATUS_TEXT[state.locale]
+  exporting = true
+  el.pdf.disabled = true
+  setStatus(label.exporting)
+  try {
+    const { exportPdf } = await import('./pdf.js')
+    const base = (state.displayPath.split('/').pop() || 'document').replace(/\.[^.]+$/, '')
+    const result = await exportPdf({ name: base })
+    // 不能走浏览器下载：Electron 会把 blob: 当成「打开」。交给宿主写到文档旁边。
+    post('save-pdf', { data: await blobToBase64(result.blob) })
+  } catch (error) {
+    console.error('[dsh-marktext] PDF export failed', error)
+    setStatus(label.exportFailed, 'error')
+  } finally {
+    exporting = false
+    el.pdf.disabled = false
+  }
+}
+
 
 /* ── muya ───────────────────────────────────────────────────── */
 
@@ -205,6 +301,11 @@ function loadDocument(content) {
   el.name.textContent = state.displayPath.split('/').pop() || 'Markdown'
   el.name.title = state.displayPath
   el.save.textContent = SAVE_LABEL[state.locale]
+  const tool = TOOL_LABEL[state.locale]
+  el.quote.textContent = tool.quote
+  el.quote.title = tool.quoteTitle
+  el.pdf.textContent = tool.pdf
+  el.pdf.title = tool.pdfTitle
   applyTheme(content.dark)
   if (!state.booted) createEditor(content.text ?? '')
   else replaceDocument(content.text ?? '')
@@ -241,6 +342,25 @@ window.addEventListener('message', (event) => {
     case 'theme':
       applyTheme(content.dark)
       break
+    case 'pdf-saved': {
+      const savedPath = String(content.path || '')
+      const name = savedPath.split('/').pop() || savedPath
+      setStatus(`${STATUS_TEXT[state.locale].exported} · ${name}`, 'ok')
+      el.status.title = savedPath
+      break
+    }
+    case 'pdf-error': {
+      const detail = content.message || content.code || ''
+      setStatus(`${STATUS_TEXT[state.locale].exportFailed}${detail ? `: ${detail}` : ''}`, 'error')
+      break
+    }
+    case 'chat-inserted': {
+      const label = STATUS_TEXT[state.locale]
+      if (content.mode === 'draft') setStatus(label.inserted, 'ok')
+      else if (content.mode === 'clipboard') setStatus(label.copied, 'warn')
+      else setStatus(label.failed, 'error')
+      break
+    }
     case 'reload-doc':
       loadDocument(content)
       break
@@ -250,6 +370,17 @@ window.addEventListener('message', (event) => {
 })
 
 el.save.addEventListener('click', () => requestSave())
+
+// 点按钮会抢焦点、把编辑器选区清掉，所以按下时就阻止默认行为，保住选区。
+el.quote.addEventListener('mousedown', (event) => event.preventDefault())
+el.quote.addEventListener('click', () => quoteSelection())
+el.pdf.addEventListener('click', () => void exportDocument())
+
+let selectionTimer = null
+document.addEventListener('selectionchange', () => {
+  clearTimeout(selectionTimer)
+  selectionTimer = setTimeout(rememberSelection, 120)
+})
 
 // 编辑器里的链接交给宿主处理：`other.md` 应该在 DSH 里再开一个 marktext 标签页，
 // 而不是让 iframe 导航到原始文件（浏览器会把 .md 当纯文本显示）。
@@ -279,6 +410,12 @@ document.addEventListener('keydown', (event) => {
     return
   }
 
+  if (key === 'p') {
+    event.preventDefault()
+    void exportDocument()
+    return
+  }
+
   // muya 只暴露 undo()/redo()，不自己绑快捷键；编辑器外层（MarkText 桌面端）负责这一步。
   if (!state.muya) return
   const target = event.target
@@ -301,4 +438,5 @@ window.addEventListener('beforeunload', () => {
 })
 
 registerUiPlugins()
+
 post('ready')
