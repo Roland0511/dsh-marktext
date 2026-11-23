@@ -35,7 +35,7 @@
 - **📄 直接导出一个 PDF 文件。** 顶栏 **PDF**（或 `⌘P`）把当前文档变成 A4 的 `.pdf`，**就放在文档旁边**，并在侧栏打开让你当场验收——不经过打印对话框，没有下载提示，也不用再点「存储为 PDF」。导出前会先按页宽重排一遍，所以字是正常大小，而不是侧栏那么窄的一条；分页找空白行切，不会把一行字劈成两半。
 - **📊 公式和图表直接渲染。** KaTeX、Mermaid、Vega、PlantUML 随插件一起发，按需加载，**离线可用**，不依赖 CDN，也不用登录。
 - **🖼️ 图片落在该在的位置。** `![](assets/diagram.png)` 按文档所在目录解析，在别处写的文档搬进来照样显示正常。
-- **💾 保存这件事很无聊，但这正是它该有的样子。** 停手 2.5 秒自动保存，`⌘S` 立即保存；磁盘上的文件被别人改过就弹冲突，绝不静默覆盖。
+- **💾 保存这件事很无聊，但这正是它该有的样子。** 停手 2.5 秒自动保存，`⌘S` 立即保存；磁盘上的文件被别人改过，**侧栏会自动刷新成新内容**——除非你有还没保存的修改，那就弹冲突横幅让你决定，绝不静默覆盖。
 - **🌗 长得就像 DSH。** 明暗跟随宿主，不会突然变成另一套皮肤。
 - **⌨️ 手指不用重新学。** `⌘Z` / `⇧⌘Z` 撤销重做、`⌘S` 保存、`⌘P` 导出 PDF、`⌘F` 查找。
 
@@ -55,7 +55,7 @@ dsh plugin --profile web add dsh-marktext
 ```jsonc
 {
   "dsh": { "profile": { "bundles": [..., "dsh-marktext"] } },
-  "dependencies": { ..., "dsh-marktext": "^0.1.13" }
+  "dependencies": { ..., "dsh-marktext": "^0.1.14" }
 }
 ```
 
@@ -77,7 +77,7 @@ cd ~/.dsh/profiles/desktop && pnpm install
 |---|---|
 | **任何 Markdown 都能开**<br/>`*.md`、`*.markdown`、`*.mdown`、`*.mkd` 在侧栏直接以编辑页签打开。 | **真正的编辑**<br/>表格、代码块、引用、任务列表都能直接操作，不是拿文本改来改去。 |
 | **引用到对话**<br/>选中 → **引用** → 带出处路径的引用块落进输入框草稿。 | **导出 PDF**<br/>`⌘P` 或顶栏按钮，真正的 A4 文件，按页宽排版，落在 `.md` 旁边并在侧栏打开。 |
-| **公式与图表**<br/>KaTeX 行内/块级、Mermaid、Vega-Lite、PlantUML、Prism 高亮。 | **带版本校验的保存**<br/>乐观并发，冲突会暴露出来而不是被覆盖。 |
+| **公式与图表**<br/>KaTeX 行内/块级、Mermaid、Vega-Lite、PlantUML、Prism 高亮。 | **带版本校验的保存**<br/>乐观并发；没有未保存修改时外部改动自动刷新，否则暴露冲突而不是覆盖。 |
 | **相对路径图片**<br/>按文档目录解析，走每个文档自己的令牌。 | **文件之间的链接**<br/>`[next](next.md)` 在另一个 MarkText 页签打开，而不是当纯文本。 |
 | **原生快捷键**<br/>`⌘S` · `⌘Z` · `⇧⌘Z` · `⌘P`，自动保存，顶栏有未保存小圆点。 | **跟随 DSH**<br/>明暗主题、语言、宿主自己的侧栏外观。 |
 
@@ -95,9 +95,10 @@ renderer/（独立 Vite 构建，内含 muya + mermaid）
 lib/index.js（宿主侧插件）
   · /dsh-marktext/renderer/<token>/*   静态资源；未命中回落到文档目录
   · /dsh-marktext/api/open|save|stat   经 ctx.fs；保存必须带 baseVersion
+  · 渲染器每 2 秒轮询 stat，别处改的文件不重开页签也能看到
 ```
 
-编辑器放在 iframe 里是刻意的：muya 把 CSS 变量声明在 `:root` 上，浮动工具栏又挂在 `document.body` 上，内联进宿主会漏样式。iframe 把这些全隔开，跨边界的只有文档、主题和保存。
+编辑器放在 iframe 里是刻意的：muya 把 CSS 变量声明在 `:root` 上，浮动工具栏又挂在 `document.body` 上，内联进宿主会漏样式。iframe 把这些全隔开，跨边界的只有文档、刷新、主题和保存。
 
 <details>
 <summary>消息协议（v1）与文件策略兜底</summary>
@@ -106,7 +107,7 @@ lib/index.js（宿主侧插件）
 
 | 方向 | type | content |
 |---|---|---|
-| down | `doc` | `{ path, displayPath, text, version, dark, locale }` |
+| down | `doc` | `{ path, displayPath, cwd, text, version, dark, locale }` |
 | down | `saved` | `{ version }` |
 | down | `save-error` | `{ code, message }` |
 | down | `theme` | `{ dark }` |
@@ -117,11 +118,14 @@ lib/index.js（宿主侧插件）
 | up | `dirty` | `{ dirty }` |
 | up | `save` | `{ text, baseVersion }` |
 | up | `reload` | — |
+| up | `reloaded` | `{ path, version }` |
 | up | `insert-chat` | `{ text }` |
 | up | `save-pdf` | `{ data }`（base64） |
 | up | `open-external` | `{ href }` |
 
 **引用怎么进对话。** 客户端先解析页签所属的 session，向 `ctx.conversation.input.for(sessionCtx)` 要输入框门面，再用 `setDraft` 把 `buildQuote(选区, 路径)` 追加到当前草稿后面——输入框自己的撤销栈还在，一次撤销就能退回去。宿主没有 conversation 服务时（老版本 DSH，或 profile 里没装对话插件），引用改放剪贴板，并在顶栏如实提示：功能降级，但不会消失。
+
+**外部修改自动刷新。** 页签打开期间，渲染器每 2 秒向 `/dsh-marktext/api/stat` 问一次版本。版本变了且没有未保存修改时，它通过 `/api/open` 重新读盘、原地换掉编辑器内容（状态栏显示「已自动刷新」），再把新版本用 `reloaded` 上报给客户端，保证保存版本守卫同步。有未保存修改时绝不覆盖：弹冲突横幅，点「重新加载」才丢弃本地修改；文件被删除/移走时也会提示，并继续轮询等它回来。
 
 **保存与文件策略。** 正常路径是 `ctx.fs.writeText(target, text, { kind: 'replaceIfVersion', version })`；版本过期返回 `FS_STALE_VERSION`，界面弹冲突横幅。宿主策略拒绝写入时（`FS_SANDBOX_DENIED`，例如 `workspace-write` / `read-only`），保存兜底到 Node 的 `fs.writeFile`，**但版本守卫照旧**——写前写后各校验一次。真正的 OS 错误（`EACCES` / `EPERM`）原样抛出。
 
@@ -153,7 +157,7 @@ curl -s http://127.0.0.1:<DSH端口>/dsh-marktext/api/diag | python3 -m json.too
 
 **会和其他 Markdown 插件打架吗？** 它和 `dsh-markdown-typora` 都在 `extension` 档抢 `*.md`，装一个就好。
 
-**已知限制：** 绝对路径图片（`/abs/a.png`、`file://`）还解析不了；引用需要是会话内文件（绝对路径页签会退到剪贴板）；导出的 PDF 是栅格图，文字不可选不可搜。包体约 4 MB，首屏约 1.6 MB，导出 PDF 时另加载约 240 kB。
+**已知限制：** 绝对路径图片（`/abs/a.png`、`file://`）和跳出文档目录的相对图片（`../assets/a.png`）还解析不了；引用需要是会话内文件（绝对路径页签会退到剪贴板）；导出的 PDF 是栅格图，文字不可选不可搜。包体约 4 MB，首屏约 1.6 MB，导出 PDF 时另加载约 240 kB。
 
 ## 开发
 
@@ -162,6 +166,7 @@ npm install
 npm run build:renderer            # 写出 renderer/（已入库；只有改 src/renderer 时才需要）
 npm test                          # 宿主路由、版本守卫、目录穿越、来源围栏、客户端注册、引用格式化
 node scripts/verify-renderer.mjs  # headless Chrome：打开 → 渲染 → 保存 → 落盘
+node scripts/verify-live.mjs      # headless Chrome：相对图片、外部修改自动刷新、冲突横幅
 node scripts/verify-pdf.mjs       # headless Chrome：渲染 → 导出 PDF → 校验字节
 node scripts/screenshot.mjs       # 重新生成 docs/assets/screenshot-*.png
 ```

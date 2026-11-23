@@ -35,7 +35,7 @@
 - **📄 Export a real PDF.** **PDF** in the toolbar (or `⌘P`) turns the open document into an A4 `.pdf`, writes it **next to the file** and opens it in the sidebar so you can check the result — no print dialog, no download prompt, no "Save as PDF" detour. The document is re-laid out at page width first, so text is a normal size instead of a sidebar-width strip, and pages break on blank rows so a line of text is never sliced in half.
 - **📊 Diagrams and math just render.** KaTeX, Mermaid, Vega and PlantUML ship with the plugin and load on demand — offline, no CDN, no account.
 - **🖼️ Images land where you expect.** `![](assets/diagram.png)` resolves against the document's own folder, so docs written in your editor look right here.
-- **💾 Saving is boring, in the best way.** Autosave 2.5 s after you stop typing; `⌘S` saves immediately; a changed file on disk means a conflict banner, never a silent overwrite.
+- **💾 Saving is boring, in the best way.** Autosave 2.5 s after you stop typing; `⌘S` saves immediately. A file changed on disk **reloads itself in the sidebar** — unless you have unsaved edits, in which case you get a conflict banner instead of a silent overwrite.
 - **🌗 It looks like DSH.** Light and dark follow the host, and the editor never adopts a foreign theme.
 - **⌨️ Your fingers already know it.** `⌘Z` / `⇧⌘Z` undo and redo, `⌘S` saves, `⌘P` exports a PDF, `⌘F` finds — nothing to relearn.
 
@@ -55,7 +55,7 @@ dsh plugin --profile web add dsh-marktext
 ```jsonc
 {
   "dsh": { "profile": { "bundles": [..., "dsh-marktext"] } },
-  "dependencies": { ..., "dsh-marktext": "^0.1.13" }
+  "dependencies": { ..., "dsh-marktext": "^0.1.14" }
 }
 ```
 
@@ -77,7 +77,7 @@ Then restart the app.
 |---|---|
 | **Open any Markdown**<br/>`*.md`, `*.markdown`, `*.mdown`, `*.mkd` in the sidebar open in an editing tab. | **Real editing**<br/>Tables, code blocks, quotes, task lists — direct manipulation, not text surgery. |
 | **Quote into the chat**<br/>Select → **Quote** → a blockquote with its source path lands in the composer draft. | **PDF export**<br/>`⌘P` or the toolbar button; a real A4 file laid out at page width, saved beside the `.md` and opened in the sidebar. |
-| **Math & diagrams**<br/>KaTeX inline/block, Mermaid, Vega-Lite, PlantUML, Prism highlighting. | **Version-guarded saves**<br/>Optimistic concurrency; conflicts surface instead of clobbering. |
+| **Math & diagrams**<br/>KaTeX inline/block, Mermaid, Vega-Lite, PlantUML, Prism highlighting. | **Version-guarded saves**<br/>Optimistic concurrency; external edits auto-reload when clean, otherwise conflicts surface instead of clobbering. |
 | **Relative images**<br/>Resolved against the document folder through a per-document token. | **Links between files**<br/>`[next](next.md)` opens in another MarkText tab, not as raw text. |
 | **Native shortcuts**<br/>`⌘S` · `⌘Z` · `⇧⌘Z` · `⌘P`, autosave, and a dirty-state dot in the toolbar. | **Follows DSH**<br/>Light/dark theme, locale, and the host's own sidebar chrome. |
 
@@ -95,9 +95,10 @@ renderer/ (standalone Vite build, contains muya + mermaid)
 lib/index.js (host plugin)
   · /dsh-marktext/renderer/<token>/*   static assets; misses fall back to the document folder
   · /dsh-marktext/api/open|save|stat   through ctx.fs; save requires baseVersion
+  · the renderer polls stat every 2 s, so edits made elsewhere show up without reopening the tab
 ```
 
-The editor runs in an iframe on purpose: muya declares its CSS variables on `:root` and appends floating toolbars to `document.body`, so inlining it would leak styles into the host. The iframe isolates all of that; only document, theme and save calls cross the boundary.
+The editor runs in an iframe on purpose: muya declares its CSS variables on `:root` and appends floating toolbars to `document.body`, so inlining it would leak styles into the host. The iframe isolates all of that; only document, refresh, theme and save calls cross the boundary.
 
 <details>
 <summary>Message protocol (v1) and the file-policy fallback</summary>
@@ -106,7 +107,7 @@ Envelope: `{ __dshmkt: true, dir: 'down' | 'up', type, content }`
 
 | Direction | type | content |
 |---|---|---|
-| down | `doc` | `{ path, displayPath, text, version, dark, locale }` |
+| down | `doc` | `{ path, displayPath, cwd, text, version, dark, locale }` |
 | down | `saved` | `{ version }` |
 | down | `save-error` | `{ code, message }` |
 | down | `theme` | `{ dark }` |
@@ -117,11 +118,14 @@ Envelope: `{ __dshmkt: true, dir: 'down' | 'up', type, content }`
 | up | `dirty` | `{ dirty }` |
 | up | `save` | `{ text, baseVersion }` |
 | up | `reload` | — |
+| up | `reloaded` | `{ path, version }` |
 | up | `insert-chat` | `{ text }` |
 | up | `save-pdf` | `{ data }` (base64) |
 | up | `open-external` | `{ href }` |
 
 **Quoting into the chat.** The client resolves the tab's session, asks `ctx.conversation.input.for(sessionCtx)` for the composer facade, and appends `buildQuote(selection, path)` to the current draft with `setDraft`. The composer keeps its own history, so the quote is one undo step away. If the host doesn't expose the conversation service (older DSH, or a profile without the conversation plugin), the quote goes to the clipboard instead and the toolbar says so — the feature degrades, it doesn't disappear.
+
+**Live reload.** The renderer polls `/dsh-marktext/api/stat` every 2 s while the tab is open. When the version changes and there is nothing unsaved, it re-reads the document through `/api/open` and swaps the content in place (status: *reloaded*), then reports the fresh version up as `reloaded` so the client's save guard stays in sync. With unsaved edits it never touches the buffer: a conflict banner offers *reload* (discarding local changes) instead. If the file disappears, the banner says so and the poll keeps watching for it to come back.
 
 **Saving and the file policy.** The normal path is `ctx.fs.writeText(target, text, { kind: 'replaceIfVersion', version })`; a stale version returns `FS_STALE_VERSION` and the UI shows a conflict banner. If the host policy refuses the write (`FS_SANDBOX_DENIED`, e.g. `workspace-write` / `read-only`), the save falls back to Node's `fs.writeFile` **with the version guard intact** — the version is checked before and re-read after. Real OS errors (`EACCES` / `EPERM`) still surface as-is.
 
@@ -153,7 +157,7 @@ curl -s http://127.0.0.1:<DSH-port>/dsh-marktext/api/diag | python3 -m json.tool
 
 **Does it fight with other Markdown plugins?** Both it and `dsh-markdown-typora` claim `*.md` in the `extension` band, so install one of them, not both.
 
-**Known limits:** absolute image paths (`/abs/a.png`, `file://`) aren't resolved yet; quoting needs a session-scoped file (an absolute-path tab falls back to the clipboard); the exported PDF is raster, so its text can't be selected or searched. Package size ≈4 MB tarball; first paint ≈1.6 MB, plus ≈240 kB only when you export a PDF.
+**Known limits:** absolute image paths (`/abs/a.png`, `file://`) and relative images that climb out of the document folder (`../assets/a.png`) aren't resolved yet; quoting needs a session-scoped file (an absolute-path tab falls back to the clipboard); the exported PDF is raster, so its text can't be selected or searched. Package size ≈4 MB tarball; first paint ≈1.6 MB, plus ≈240 kB only when you export a PDF.
 
 ## Development
 
@@ -162,6 +166,7 @@ npm install
 npm run build:renderer            # writes renderer/ (committed; only needed when src/renderer changes)
 npm test                          # host routes, version guard, traversal, origin fence, client registration, quote formatting
 node scripts/verify-renderer.mjs  # headless Chrome: open → render → save → disk
+node scripts/verify-live.mjs      # headless Chrome: relative images, external-change auto-reload, conflict banner
 node scripts/verify-pdf.mjs       # headless Chrome: render → export PDF → assert the bytes
 node scripts/screenshot.mjs       # regenerates docs/assets/screenshot-*.png
 ```

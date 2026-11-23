@@ -25,8 +25,13 @@ import {
 } from '@muyajs/core'
 import '@muyajs/core/lib/core.css'
 import './style.css'
+import { classifyExternalChange } from './external-change.js'
+import { resolveMarkdownImagePath } from './image-path.js'
 
 const AUTOSAVE_MS = 2500
+/** 外部修改轮询间隔：本地 fs.stat 很便宜，2 秒足够“几乎实时”又不打扰。 */
+const WATCH_INTERVAL_MS = 2000
+const API_BASE = '/dsh-marktext/api/'
 const ENVELOPE = '__dshmkt'
 const SAVE_LABEL = { zh: '保存', en: 'Save' }
 const TOOL_LABEL = {
@@ -42,6 +47,13 @@ const STATUS_TEXT = {
     exporting: '正在生成 PDF…',
     exported: '已保存',
     exportFailed: 'PDF 生成失败',
+    autoRefreshed: '文件已更新，已自动刷新',
+    reloaded: '已重新加载',
+    refreshFailed: '重新加载失败',
+    saveFailed: '保存失败',
+    externalChanged: '文件已被其他程序修改',
+    externalUnloadable: '文件已被其他程序修改。重新加载会丢弃当前未保存的修改。',
+    missing: '文件已被删除或移走，等待它回来…',
   },
   en: {
     noSelection: 'Select some text first',
@@ -51,6 +63,13 @@ const STATUS_TEXT = {
     exporting: 'Building PDF…',
     exported: 'Saved',
     exportFailed: 'PDF export failed',
+    autoRefreshed: 'File changed on disk — reloaded',
+    reloaded: 'Reloaded',
+    refreshFailed: 'Reload failed',
+    saveFailed: 'Save failed',
+    externalChanged: 'File changed outside the editor',
+    externalUnloadable: 'The file changed outside the editor. Reloading discards your unsaved changes.',
+    missing: 'File was deleted or moved — waiting for it to come back…',
   },
 }
 
@@ -71,6 +90,8 @@ const state = {
   muya: null,
   path: '',
   displayPath: '',
+  /** 会话 cwd：path 为会话内相对路径时，重新读盘/stat 要靠它再解析一次。 */
+  cwd: '',
   version: '',
   dirty: false,
   saving: false,
@@ -81,7 +102,25 @@ const state = {
   dark: false,
   /** 最近一次非空选区。点按钮会让编辑器失焦，所以点击前要先记住。 */
   selection: '',
+  /** 外部修改轮询：计时器 + 三条“正在进行”的互斥标记。 */
+  watchTimer: null,
+  watching: false,
+  reloading: false,
+  /** 已经提示过“磁盘上有新版本、但本地有未保存修改”。 */
+  externalPending: false,
+  /** 已经提示过“文件不见了”，等它回来再清掉横幅。 */
+  missingShown: false,
 }
+
+
+/* ── 图片地址 ───────────────────────────────────────────────── */
+
+/**
+ * muya 会把非 http(s) 的图片地址拼成 `file://`，在 http 页面里加载不了。
+ * 构建时 vite.config.js 把 muya 的那处实现换成调用这个解析器；这里按 iframe 的
+ * base（`/dsh-marktext/renderer/<token>/`）还原成宿主可回源的 URL。
+ */
+globalThis.__dshmktResolveImagePath = (raw) => resolveMarkdownImagePath(raw, document.baseURI)
 
 
 /* ── 父页面通道 ─────────────────────────────────────────────── */
@@ -132,6 +171,133 @@ function applyTheme(dark) {
   state.dark = Boolean(dark)
   document.documentElement.classList.toggle('dark', state.dark)
   document.documentElement.style.colorScheme = state.dark ? 'dark' : 'light'
+}
+
+/* ── 外部修改：轮询 + 自动刷新 / 冲突提示 ───────────────────── */
+
+async function api(endpoint, payload) {
+  const response = await fetch(API_BASE + endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload ?? {}),
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response.json()
+}
+
+/** stat / open 用的目标：显示路径 + 会话 cwd（绝对路径时 cwd 不影响解析）。 */
+function watchPayload() {
+  return { path: state.path, ...(state.cwd ? { cwd: state.cwd } : {}) }
+}
+
+/** 弹出“磁盘上已变、但本地有未保存修改”的冲突横幅；点按钮才丢改动重载。 */
+function markExternalConflict() {
+  const labels = STATUS_TEXT[state.locale]
+  state.externalPending = true
+  setStatus(labels.externalChanged, 'warn')
+  showBanner(labels.externalUnloadable, () => void reloadFromDisk())
+}
+
+/**
+ * 重新从磁盘读一遍（保留 iframe / 编辑器实例，只换正文和版本）。
+ * 自动刷新和冲突横幅的「重新加载」都走这里：读失败只在状态栏报错，
+ * 不会像客户端层重开页签那样把当前文档换成错误页。
+ * @param {{ auto?: boolean }} [options] auto=true 表示是轮询触发的
+ */
+async function reloadFromDisk(options = {}) {
+  if (!state.path || state.reloading) return false
+  const auto = options.auto === true
+  const labels = STATUS_TEXT[state.locale]
+  state.reloading = true
+  try {
+    const result = await api('open', watchPayload())
+    if (!result || result.ok !== true) {
+      const error = result?.error ?? {}
+      setStatus(`${labels.refreshFailed}${error.code ? `: ${error.code}` : ''}`, 'error')
+      return false
+    }
+    // 读盘期间用户可能已经开始输入：自动刷新这时必须让位，改成冲突提示。
+    if (auto && state.dirty) {
+      markExternalConflict()
+      return false
+    }
+    const value = result.value
+    state.externalPending = false
+    state.missingShown = false
+    loadDocument({
+      path: value.displayPath,
+      displayPath: value.displayPath,
+      cwd: state.cwd,
+      text: value.text,
+      version: value.version,
+      dark: state.dark,
+      locale: state.locale,
+    })
+    setStatus(auto ? labels.autoRefreshed : labels.reloaded, 'ok')
+    // 告诉客户端半边：页签里的版本号变了，后续保存和状态展示要跟上。
+    post('reloaded', { path: value.displayPath, version: value.version })
+    return true
+  } catch (cause) {
+    setStatus(`${labels.refreshFailed}: ${String(cause?.message ?? cause)}`, 'error')
+    return false
+  } finally {
+    state.reloading = false
+  }
+}
+
+/** 一轮外部修改检测。失败（宿主重启等）静默跳过，下一轮再试。 */
+async function checkExternalChange() {
+  if (!state.booted || !state.path || state.saving || state.reloading || state.watching) return
+  if (typeof document.visibilityState === 'string' && document.visibilityState === 'hidden') return
+  state.watching = true
+  const labels = STATUS_TEXT[state.locale]
+  try {
+    const result = await api('stat', watchPayload())
+    if (!result || result.ok !== true) return
+    // 请求在飞的时候可能刚触发了保存/另一轮重载：这一轮结果已经过时，丢掉。
+    if (state.saving || state.reloading) return
+    const value = result.value || {}
+    const action = classifyExternalChange({
+      version: value.version,
+      currentVersion: state.version,
+      dirty: state.dirty,
+      missing: value.missing === true,
+    })
+    if (action === 'none') {
+      // 文件恢复（或用户刚保存过）时，收掉之前的“文件不见了”提示。
+      if (state.missingShown) {
+        state.missingShown = false
+        hideBanner()
+        setStatus('')
+      }
+      return
+    }
+    if (action === 'missing') {
+      if (state.missingShown) return
+      state.missingShown = true
+      setStatus(labels.missing, 'error')
+      showBanner(labels.missing)
+      return
+    }
+    if (action === 'conflict') {
+      if (!state.externalPending) markExternalConflict()
+      return
+    }
+    await reloadFromDisk({ auto: true })
+  } catch {
+    /* 轮询失败静默：宿主可能正在重启，下一轮再试 */
+  } finally {
+    state.watching = false
+  }
+}
+
+/** 开启（幂等的）外部修改轮询；页签隐藏时跳过，不空转。 */
+function startWatching() {
+  if (state.watchTimer) return
+  state.watchTimer = setInterval(() => void checkExternalChange(), WATCH_INTERVAL_MS)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') void checkExternalChange()
+  })
 }
 
 /* ── 选区 / 引用到对话 / 导出 PDF ───────────────────────────── */
@@ -296,8 +462,11 @@ function loadDocument(content) {
   hideBanner()
   state.path = content.path || ''
   state.displayPath = content.displayPath || content.path || ''
+  state.cwd = typeof content.cwd === 'string' ? content.cwd : ''
   state.version = content.version || ''
   state.locale = content.locale === 'en' ? 'en' : 'zh'
+  state.externalPending = false
+  state.missingShown = false
   el.name.textContent = state.displayPath.split('/').pop() || 'Markdown'
   el.name.title = state.displayPath
   el.save.textContent = SAVE_LABEL[state.locale]
@@ -311,6 +480,7 @@ function loadDocument(content) {
   else replaceDocument(content.text ?? '')
   markDirty(false)
   setStatus('')
+  startWatching()
   post('ready-ack', { path: state.path })
 }
 
@@ -327,14 +497,17 @@ window.addEventListener('message', (event) => {
     case 'saved':
       state.version = content.version || state.version
       state.saving = false
+      state.externalPending = false
+      state.missingShown = false
+      hideBanner()
       markDirty(false)
       setStatus('已保存', 'ok')
       break
     case 'save-error':
       state.saving = false
       if (content.code === 'FS_STALE_VERSION') {
-        setStatus('保存失败', 'error')
-        showBanner('文件已被其他程序修改。重新加载会丢弃当前未保存的修改。', () => post('reload', {}))
+        setStatus(STATUS_TEXT[state.locale].saveFailed, 'error')
+        showBanner(STATUS_TEXT[state.locale].externalUnloadable, () => void reloadFromDisk())
       } else {
         setStatus(content.message || '保存失败', 'error')
       }
@@ -435,6 +608,7 @@ document.addEventListener('keydown', (event) => {
 
 window.addEventListener('beforeunload', () => {
   clearTimeout(state.autosaveTimer)
+  clearInterval(state.watchTimer)
 })
 
 registerUiPlugins()

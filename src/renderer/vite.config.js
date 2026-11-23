@@ -27,9 +27,43 @@ function mermaidRuntimeShim() {
   }
 }
 
+/**
+ * muya 的图片渲染把「非 http(s) / data:」的地址硬拼成 `file://<原地址>`（它服务于
+ * MarkText 桌面端，那里能读本地文件）。渲染器实际跑在 http 页面的 iframe 里，
+ * `file://` 会被浏览器拒绝，于是 `![](assets/a.png)` 这类相对图片全部加载失败。
+ *
+ * 这里在构建时把那一处 `file://` 前缀换成运行时解析器（main.js 注入
+ * `globalThis.__dshmktResolveImagePath`）：相对路径按 iframe 的 base 解析成
+ * `/dsh-marktext/renderer/<token>/...`，由宿主按文档目录回源；Markdown 源文本不变，
+ * 保存时写回的仍然是用户写的相对路径。见 image-path.js。
+ *
+ * 替换点依赖 @muyajs/core 的版本（package.json 里锁死）；找不到或找到多处就直接让
+ * 构建失败，避免升级后被静默跳过、图片又悄悄坏掉。
+ */
+function muyaImagePathShim() {
+  const NEEDLE = 'src: `file://${e}`'
+  const REPLACEMENT =
+    'src: globalThis.__dshmktResolveImagePath ? globalThis.__dshmktResolveImagePath(e) : `file://${e}`'
+  return {
+    name: 'muya-image-path-shim',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.replace(/\\/g, '/').endsWith('/@muyajs/core/lib/es/index.js')) return null
+      const occurrences = code.split(NEEDLE).length - 1
+      if (occurrences !== 1) {
+        throw new Error(
+          `dsh-marktext: @muyajs/core 的图片路径实现变了（匹配到 ${occurrences} 处 ${JSON.stringify(NEEDLE)}），` +
+            '请先确认 muya 的图片渲染逻辑，再更新 vite.config.js 里的 muyaImagePathShim',
+        )
+      }
+      return { code: code.replace(NEEDLE, REPLACEMENT), map: null }
+    },
+  }
+}
+
 export default defineConfig({
   root: here,
-  plugins: [mermaidRuntimeShim()],
+  plugins: [muyaImagePathShim(), mermaidRuntimeShim()],
   base: './',
   build: {
     outDir: resolve(here, '../../renderer'),
